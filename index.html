@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>首頁</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+    <link rel="stylesheet" href="css/all.css"/>
+  </head>
+  <body>
+    <div id="app">
+      <div class="container">
+        <div class="mt-4">
+          <!-- 產品Modal-->
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th>圖片</th>
+                <th>商品名稱</th>
+                <th>價格</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in products" :key="item.id">
+                <td style="width: 200px">
+                  <div :style="{'backgroundImage': `url(${item.imageUrl})`}" style="height: 100px; background-image:`url(&quot;${item.imageUrl}&quot;)`}; background-size: cover; background-position: center"></div>
+                </td>
+                <td>{{ item.title }}</td>
+                <td>
+                  <!-- 如果原價跟銷售價一樣就顯示 v-if 行數，否則就顯示原價跟銷售價-->
+                  <h5 v-if="item.price === item.origin_price">{{ item.price }} 元</h5>
+                  <div v-else="">
+                    <del class="h6">原價 {{ item.origin_price }} 元</del>
+                    <div class="h5">現在只要 {{ item.price }} 元</div>
+                  </div>
+                </td>
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <!-- 綁定 disabled 當 id 相同，資料尚未讀取完成就將按鈕 disabled，避免重複點擊-->
+                    <button class="btn btn-outline-secondary" type="button" @click="productDetail(item.id)" :disabled="disable === item.id">
+                      <!-- 加入 loading 效果--><span class="spinner-grow spinner-grow-sm" v-if="detailLoading"> </span>查看更多
+                    </button>
+                    <!-- 綁定 disabled 當 id 相同，資料尚未讀取完成就將按鈕 disabled，避免重複點擊-->
+                    <button class="btn btn-outline-danger" type="button" @click="addCard(item.id)" :disabled="disable === item.id">
+                      <!-- 加入 loading 效果--><span class="spinner-grow spinner-grow-sm" v-if="addLoading"> </span>加到購物車
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <!-- 購物車清單-->
+          <div class="d-flex justify-content-end mb-3">
+            <!-- 如果購物車為空無法點擊清空購物車-->
+            <button class="btn btn-outline-danger" type="button" @click="delAllCarts" :class="{'disabled':carts.total === 0}">清空購物車</button>
+          </div>
+          <!-- 如果有購物車陣列在顯示，另外判斷方式為 carts.carts.length > 1，但要再 data 內的 carts 物件內再加上 carts: []，不然會抓不到就會產生錯誤-->
+          <template v-if="carts.total">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>品名</th>
+                  <th style="width: 150px">數量/單位</th>
+                  <th>單價</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item,index) in carts.carts" :key="item.id">
+                  <td>
+                    <button class="btn btn-outline-danger btn-sm" type="button" @click="delCard(item.id)"><i class="fa-solid fa-trash-can"> </i></button>
+                  </td>
+                  <td>{{ item.product.title }}</td>
+                  <td>
+                    <div class="input-group input-group-sm">
+                      <div class="input-group mb-3">
+                        <input class="form-control" min="1" type="number" v-model="item.qty" @change="update(item,index)" ref="numInput" :disabled="disable === item.id"/><span class="input-group-text" id="basic-addon2">{{ item.product.unit}}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-right">{{ item.total }}</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td class="text-right" colspan="3">總計</td>
+                  <td class="text-right">{{ carts.total }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </template>
+          <!-- 購物車為空就前往購物        -->
+          <template v-else=""> 
+            <div class="d-flex justify-content-center">
+              <button class="btn btn-outline-danger" type="button">前往購物</button>
+            </div>
+          </template>
+        </div>
+        <!-- modal-->
+        <div class="modal fade" id="productModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" ref="productModal">
+          <product-modal :temp="temp" @get-cart="getCarts" :modal="modal"></product-modal>
+        </div>
+        <!-- 驗證表單-->
+        <div class="my-5 row justify-content-center">
+          <v-form class="col-md-6" ref="form" v-slot="{ errors }" @submit="sendForm">
+            <div class="mb-3">
+              <label class="form-label" for="email">Email</label>
+              <v-field class="form-control" id="email" name="電子信箱" type="email" :class="{ 'is-invalid': errors['電子信箱'] }" placeholder="請輸入 Email" rules="email|required" v-model="user.email"></v-field>
+              <error-message class="invalid-feedback" name="電子信箱"></error-message>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="name">收件人姓名</label>
+              <v-field class="form-control" id="name" name="姓名" type="text" :class="{ 'is-invalid': errors['姓名'] }" placeholder="請輸入姓名" rules="required" v-model="user.name"></v-field>
+              <error-message class="invalid-feedback" name="姓名"></error-message>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="tel">收件人電話</label>
+              <v-field class="form-control" id="tel" name="電話" type="tel" :class="{ 'is-invalid': errors['電話'] }" placeholder="請輸入電話" :rules="isPhone" v-model="user.tel"></v-field>
+              <error-message class="invalid-feedback" name="電話"></error-message>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="address">收件人地址</label>
+              <v-field class="form-control" id="address" name="地址" type="text" :class="{ 'is-invalid': errors['地址'] }" placeholder="請輸入地址" rules="required" v-model="user.address"></v-field>
+              <error-message class="invalid-feedback" name="地址"></error-message>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="message">留言</label>
+              <textarea class="form-control" id="message" cols="30" rows="10" v-model="message"></textarea>
+            </div>
+            <div class="text-end">
+              <!-- 如果沒有通過驗證或是購物車為空無法點擊送出訂單按鈕-->
+              <button class="btn btn-danger" type="submit" :disabled="Object.keys(errors).length &gt; 0 || carts.total === 0">送出訂單</button>
+            </div>
+          </v-form>
+        </div>
+      </div>
+    </div>
+    <script src="js/vendors.js"></script>
+    <script src="https://unpkg.com/vue@next"> </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vee-validate/4.5.8/vee-validate.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vee-validate/rules@4.5.8/dist/vee-validate-rules.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vee-validate/i18n@4.5.8/dist/vee-validate-i18n.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/js/bootstrap.bundle.min.js"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.1/dist/umd/popper.min.js"> </script>
+    <script src="js/index.js" type="module"></script>
+  </body>
+</html>
